@@ -568,10 +568,11 @@ package otlib.things
             if (!bitmap)
                 throw new NullArgumentError("bitmap");
 
-            var ss:Size = frameGroup.getSpriteSheetSize();
-            if (bitmap.width != ss.width ||
-                    bitmap.height != ss.height)
+            if (!frameGroup.matchesSpriteSheetSize(bitmap.width, bitmap.height))
                 return;
+            var ss:Size = frameGroup.getSpriteSheetSize();
+            var horizontalFrames:Boolean = bitmap.width != ss.width || bitmap.height != ss.height;
+            var frameHeight:uint = frameGroup.patternY * frameGroup.height * SpriteExtent.DEFAULT_SIZE;
 
             bitmap = SpriteUtils.removeMagenta(bitmap);
 
@@ -595,6 +596,12 @@ package otlib.things
                                 var index:uint = frameGroup.getTextureIndex(l, x, y, z, f);
                                 var fx:int = (index % totalX) * pixelsWidth;
                                 var fy:int = Math.floor(index / totalX) * pixelsHeight;
+                                if (horizontalFrames)
+                                {
+                                    // Move complete frame blocks, without rotating tiles or changing patterns.
+                                    fx += f * ss.width;
+                                    fy -= f * frameHeight;
+                                }
 
                                 for (var w:uint = 0; w < frameGroup.width; w++)
                                 {
@@ -610,6 +617,7 @@ package otlib.things
 
                                         var sd:SpriteData = new SpriteData();
                                         sd.pixels = bmp.getPixels(bmp.rect);
+                                        bmp.dispose();
                                         sd.id = uint.MAX_VALUE;
 
                                         m_sprites[frameGroup.type][index] = sd;

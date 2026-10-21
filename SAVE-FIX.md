@@ -1,9 +1,22 @@
-# Object Builder save fix
+# Object Builder save and import fixes
 
 This patched build is based on upstream Object Builder 0.6.0 and labelled
-`0.6.0-savefix.1`. It uses a separate application ID and preferences so it can
+`0.6.0-savefix.2`. It uses a separate application ID and preferences so it can
 coexist with an older installation. Launch `ObjectBuilder.exe` and open your
 DAT/SPR project and server items as usual.
+
+## Horizontal animation strips
+
+With the object set to Width 1, Height 1, Layers 1, Pattern X/Y/Z 1 and
+Animations 17, drag a 544x32 PNG onto the texture editor. Frames are imported
+left to right automatically. The existing 32x544 vertical layout also works.
+The frame count remains controlled by the object's Animations setting.
+
+Larger frames keep their tile orientation, and each animation frame retains
+its pattern/layer grid. Only the selected frame group is replaced; the other
+group is preserved. Existing combined idle/walking sheets remain supported.
+Invalid dimensions now list complete, deduplicated sizes, such as
+`32x544, 544x32`, instead of mixing widths and heights.
 
 ## What changed
 
@@ -30,6 +43,7 @@ AIR SDK installation. Run the scripts in PowerShell 7 or later. Java 17 and AIR
 ./scripts/build-windows.ps1 -FlexSdk C:/path/to/flex -AirSdk C:/path/to/air
 ./scripts/test-save-windows.ps1 -AirSdk C:/path/to/air
 ./scripts/test-save-windows.ps1 -AirSdk C:/path/to/air -Fixture C:/path/to/copy-of-project
+python ./scripts/test-sprite-sheet-windows.py --air-sdk C:/path/to/air --image C:/path/to/544x32.png
 python ./scripts/package-windows.py --air-sdk C:/path/to/air --java-home C:/path/to/jdk --output C:/path/to/new-output-folder
 ```
 
@@ -40,7 +54,20 @@ It verifies rollback hashes, retained edits, reopening, retry, and another save.
 An optional fixture is copied into a fresh test directory before use; originals
 are never modified. Test results are retained under `bin-debug/save-test-*`.
 
-## Validation of this build
+## Validation of 0.6.0-savefix.2
+
+- 64 sprite-sheet checks passed, including all 17 frames of a supplied 544x32
+  PNG. Imported ARGB bytes and OBD round-trip bytes matched each original frame.
+- Vertical layouts, static images, non-square multi-tile frames, patterns,
+  layers, unchanged idle groups, combined idle/walking imports, and rejected
+  dimensions were covered.
+- All 48 full-project save checks passed again, including file-lock rollback
+  and retry with a copied 69,791-sprite project.
+- Main application, embedded worker and regression harnesses compiled with the
+  same toolchain. Python/PowerShell syntax checks and `git diff --check` passed.
+- The private input PNG and project assets are not included in the repository.
+
+## Previous save-fix validation (0.6.0-savefix.1)
 
 - Windows synthetic regression suite: 48 checks passed.
 - Full-project regression suite: 48 checks passed using a copied 69,791-sprite,

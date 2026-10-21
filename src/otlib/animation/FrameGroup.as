@@ -145,12 +145,25 @@ package otlib.animation
                 this.layers + layer;
         }
 
-        public function getSpriteSheetSize():Size
+        /** Each animation frame keeps its pattern/layer grid; frames can run down or across. */
+        public function getSpriteSheetSize(horizontalFrames:Boolean = false):Size
         {
             var size:Size = new Size();
             size.width = this.patternZ * this.patternX * this.layers * this.width * SpriteExtent.DEFAULT_SIZE;
-            size.height = this.frames * this.patternY * this.height * SpriteExtent.DEFAULT_SIZE;
+            size.height = this.patternY * this.height * SpriteExtent.DEFAULT_SIZE;
+            if (horizontalFrames)
+                size.width *= this.frames;
+            else
+                size.height *= this.frames;
             return size;
+        }
+
+        public function matchesSpriteSheetSize(width:uint, height:uint):Boolean
+        {
+            var vertical:Size = getSpriteSheetSize();
+            var horizontal:Size = getSpriteSheetSize(true);
+            return (width == vertical.width && height == vertical.height) ||
+                (width == horizontal.width && height == horizontal.height);
         }
 
         public function makeOutfitGroup(duration:uint):void
