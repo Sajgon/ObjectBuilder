@@ -385,91 +385,45 @@ package otlib.things
             return result;
         }
 
-        public function compile(file:File, version:Version, features:ClientFeatures):Boolean
+        /** Serialize into a fresh staging file; leave dirty state and source paths intact. */
+        public function writeStaged(file:File, version:Version, features:ClientFeatures):void
         {
-            if (!file)
-                throw new NullArgumentError("file");
-
-            if (!version)
-                throw new NullArgumentError("version");
-
-            if (!_loaded)
-                return false;
-
+            if (!file || !version || !features || !_loaded)
+                throw new ArgumentError("Cannot save metadata: missing file, version, features or loaded data.");
+            if (file.exists)
+                throw new Error("Metadata staging file already exists: " + file.nativePath);
             var compileFeatures:ClientFeatures = features.clone();
             compileFeatures.applyVersionDefaults(version.value);
-
-            var tmpFile:File = FileUtil.getDirectory(file).resolvePath("tmp_" + file.name);
-            var done:Boolean = true;
-
+            var writer:MetadataWriter = MetadataControllerStorage.getInstance().createWriter(compileFeatures.metadataController, version.value);
             try
             {
-                _thingsCount = _itemsCount + _outfitsCount + _effectsCount + _missilesCount;
-
-                var writer:MetadataWriter = MetadataControllerStorage.getInstance().createWriter(compileFeatures.metadataController, version.value);
-
                 writer.features = compileFeatures;
-                writer.open(tmpFile, FileMode.WRITE);
-                writer.writeUnsignedInt(version.datSignature); // Write sprite signature
-
-                writer.writeShort(_itemsCount); // Write items count
-                writer.writeShort(_outfitsCount); // Write outfits count
-                writer.writeShort(_effectsCount); // Write effects count
-                writer.writeShort(_missilesCount); // Write missiles count
-
-                if (!writeItemList(writer, _items, MIN_ITEM_ID, _itemsCount))
-                {
-                    done = false;
-                }
-
-                if (done && !writeThingList(writer, _outfits, MIN_OUTFIT_ID, _outfitsCount))
-                {
-                    done = false;
-                }
-
-                if (done && !writeThingList(writer, _effects, MIN_EFFECT_ID, _effectsCount))
-                {
-                    done = false;
-                }
-
-                if (done && !writeThingList(writer, _missiles, MIN_MISSILE_ID, _missilesCount))
-                {
-                    done = false;
-                }
-
+                writer.open(file, FileMode.WRITE);
+                writer.writeUnsignedInt(version.datSignature);
+                writer.writeShort(_itemsCount);
+                writer.writeShort(_outfitsCount);
+                writer.writeShort(_effectsCount);
+                writer.writeShort(_missilesCount);
+                if (!writeItemList(writer, _items, MIN_ITEM_ID, _itemsCount) ||
+                        !writeThingList(writer, _outfits, MIN_OUTFIT_ID, _outfitsCount) ||
+                        !writeThingList(writer, _effects, MIN_EFFECT_ID, _effectsCount) ||
+                        !writeThingList(writer, _missiles, MIN_MISSILE_ID, _missilesCount))
+                    throw new Error("Failed to serialize object metadata.");
+            }
+            finally
+            {
                 writer.close();
             }
-            catch (error:Error)
-            {
-                if (error.errorID == 3001)
-                    Log.error(Resources.getString("accessDenied"));
-                else
-                    dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false, error.getStackTrace(), error.errorID));
+        }
 
-                done = false;
-            }
-
-            if (done)
-            {
-                var fileName:String = FileUtil.getName(file);
-
-                // Delete old file.
-                if (file.exists)
-                    file.deleteFile();
-
-                // Rename temporary file
-                _file = FileUtil.rename(tmpFile, fileName);
-                _changed = false;
-            }
-            else if (tmpFile.exists)
-            {
-                tmpFile.deleteFile();
-            }
-
-            dispatchEvent(new StorageEvent(StorageEvent.COMPILE));
-            dispatchEvent(new StorageEvent(StorageEvent.CHANGE));
-
-            return done;
+        public function acceptSave(file:File, version:Version, features:ClientFeatures):void
+        {
+            _file = file;
+            _version = version;
+            _signature = version.datSignature;
+            _currentFeatures = features.clone();
+            _currentFeatures.applyVersionDefaults(version.value);
+            _changed = false;
         }
 
         public function hasThingType(category:String, id:uint):Boolean

@@ -264,6 +264,29 @@ package otlib.sprites
             return _hash;
         }
 
+        /** Reject truncated or overlong RLE runs before they reach a saved SPR. */
+        internal function validateCompressedPixels():void
+        {
+            if (_compressedPixels.length > 0xFFFF)
+                throw new Error("Compressed sprite exceeds the SPR length limit.");
+            _compressedPixels.position = 0;
+            var pixels:uint = 0;
+            var channels:uint = _transparent ? 4 : 3;
+            while (_compressedPixels.bytesAvailable > 0)
+            {
+                if (_compressedPixels.bytesAvailable < 4)
+                    throw new Error("Truncated sprite run header.");
+                pixels += _compressedPixels.readUnsignedShort();
+                var colored:uint = _compressedPixels.readUnsignedShort();
+                pixels += colored;
+                if (pixels > SpriteExtent.DEFAULT_SIZE * SpriteExtent.DEFAULT_SIZE ||
+                        colored * channels > _compressedPixels.bytesAvailable)
+                    throw new Error("Invalid sprite run length.");
+                _compressedPixels.position += colored * channels;
+            }
+            _compressedPixels.position = 0;
+        }
+
         public function clone():Sprite
         {
             var sprite:Sprite = new Sprite(_id, _transparent);
