@@ -268,7 +268,7 @@ package otlib.items
          * @param format The format to save as (e.g., OTB, DAT, ASSETS).
          * @param sourcePeer Optional source file for DAT/ASSETS format (the Client DAT file).
          */
-        public function save(file:File, format:String, sourcePeer:File = null):Boolean
+        public function save(file:File, format:String, sourcePeer:File = null, markClean:Boolean = true):Boolean
         {
             if (!_loaded || !_items)
                 return false;
@@ -278,7 +278,8 @@ package otlib.items
                 var writer:OtbWriter = new OtbWriter(_items);
                 if (writer.write(file))
                 {
-                    _changed = false;
+                    if (markClean)
+                        _changed = false;
                     return true;
                 }
             }
@@ -305,10 +306,16 @@ package otlib.items
             return false;
         }
 
-        /**
-         * Saves the item definitions to a file in the specified format.
-         * Supports XML and TOML (Stub).
-         */
+        /** Adopt committed server paths and clear dirty state only after the full save. */
+        public function acceptSave(file:File, definitionFormat:String, binaryFormat:String):void
+        {
+            _file = file;
+            _definitionFormat = definitionFormat;
+            _binaryFormat = binaryFormat;
+            _changed = false;
+        }
+
+        /** Save item definitions as XML or TOML (currently unsupported). */
         public function saveDefinitions(file:File, format:String):Boolean
         {
             if (!_loaded || !_items)

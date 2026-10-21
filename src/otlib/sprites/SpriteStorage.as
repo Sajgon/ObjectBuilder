@@ -568,138 +568,139 @@ package otlib.sprites
             return null;
         }
 
-        public function compile(file:File, version:Version, features:ClientFeatures):Boolean
+        /** Write only to an unused staging path. Never change the loaded session here. */
+        public function writeStaged(file:File, version:Version, features:ClientFeatures):void
         {
-            if (!file)
-            {
-                throw new NullArgumentError("file");
-            }
-
-            if (!version)
-            {
-                throw new NullArgumentError("version");
-            }
-
-            if (!_loaded)
-                return false;
+            if (!file || !version || !features || !_loaded)
+                throw new ArgumentError("Cannot save sprites: missing file, version, features or loaded data.");
+            if (file.exists)
+                throw new Error("Sprite staging file already exists: " + file.nativePath);
 
             var compileFeatures:ClientFeatures = features.clone();
             compileFeatures.applyVersionDefaults(version.value);
-            var extended:Boolean = compileFeatures.extended;
-            var transparency:Boolean = compileFeatures.transparency;
-            var equal:Boolean = FileUtil.equals(_file, file);
-            var stream:FileStream;
+            var extended:Boolean = compileFeatures.extended || version.value >= 960;
+            if (!extended && _spritesCount > 0xFFFF)
+                throw new Error("The selected SPR format cannot hold all " + _spritesCount + " sprites.");
 
-            // If is unmodified and the version is equal only save raw bytes.
-            if (!this.isTemporary &&
-                    !this.changed &&
-                    _version.equals(version) &&
-                    _currentFeatures.extended == extended &&
-                    _currentFeatures.transparency == transparency)
-            {
-                if (!equal)
-                    FileUtil.copyToAsync(_file, file);
-                return true;
-            }
-
-            var tmpFile:File = FileUtil.getDirectory(file).resolvePath("tmp_" + file.name);
-            var done:Boolean;
-            var headSize:uint;
-            var count:uint;
-
+            var stream:FileStream = new FileStream();
             try
             {
-                stream = new FileStream();
-                stream.open(tmpFile, FileMode.WRITE);
+                stream.open(file, FileMode.WRITE);
                 stream.endian = Endian.LITTLE_ENDIAN;
-                stream.writeUnsignedInt(version.sprSignature); // Write spr signature.
-
-                // Write sprites count.
-                if (extended || version.value >= 960)
-                {
-                    count = _spritesCount;
-                    headSize = SpriteFileSize.HEADER_U32;
-                    stream.writeUnsignedInt(count);
-                }
+                stream.writeUnsignedInt(version.sprSignature);
+                if (extended)
+                    stream.writeUnsignedInt(_spritesCount);
                 else
-                {
-                    count = _spritesCount >= 0xFFFF ? 0xFFFE : _spritesCount;
-                    headSize = SpriteFileSize.HEADER_U16;
-                    stream.writeShort(count);
-                }
+                    stream.writeShort(_spritesCount);
 
                 var addressPosition:uint = stream.position;
-                var offset:uint = (count * SpriteFileSize.ADDRESS) + headSize;
-                var dispatchProgess:Boolean = this.hasEventListener(ProgressEvent.PROGRESS);
-
-                for (var i:uint = 1; i <= count; i++)
+                var offset:uint = addressPosition + _spritesCount * SpriteFileSize.ADDRESS;
+                for (var i:uint = 1; i <= _spritesCount; i++)
                 {
-                    stream.position = addressPosition;
-
-                    var sprite:Sprite = getSprite(i);
-
-                    if (sprite.isEmpty)
+                    // getSprite() is deliberately NOT used: its UI fallback is an error icon.
+                    var sprite:Sprite;
+                    try
                     {
-                        stream.writeUnsignedInt(0); // Write address
+                        sprite = _sprites[i] !== undefined ? Sprite(_sprites[i]) : _reader.readSprite(i);
+                        if (sprite && (sprite == _alertSprite || sprite.id == uint.MAX_VALUE))
+                            throw new Error("An error placeholder cannot be saved.");
+                        if (sprite)
+                        {
+                            sprite.validateCompressedPixels();
+                            if (sprite.transparent != compileFeatures.transparency)
+                            {
+                                // A failed export must not change the in-memory source format.
+                                sprite = sprite.clone();
+                                sprite.transparent = compileFeatures.transparency;
+                            }
+                        }
                     }
+                    catch (readError:Error)
+                    {
+                        throw new Error("Cannot save sprite " + i + ": " + readError.message);
+                    }
+
+                    stream.position = addressPosition;
+                    if (!sprite || sprite.isEmpty)
+                        stream.writeUnsignedInt(0);
                     else
                     {
-                        sprite.transparent = transparency;
-                        sprite.compressedPixels.position = 0;
-
-                        stream.writeUnsignedInt(offset); // Write address
+                        stream.writeUnsignedInt(offset);
                         stream.position = offset;
-                        stream.writeByte(0xFF); // Write red
-                        stream.writeByte(0x00); // Write blue
-                        stream.writeByte(0xFF); // Write green
-                        stream.writeShort(sprite.length); // Write sprite data size
-
-                        if (sprite.length > 0)
-                        {
-                            stream.writeBytes(sprite.compressedPixels, 0, sprite.length);
-                        }
-
+                        stream.writeByte(0xFF);
+                        stream.writeByte(0x00);
+                        stream.writeByte(0xFF);
+                        stream.writeShort(sprite.length);
+                        stream.writeBytes(sprite.compressedPixels, 0, sprite.length);
                         offset = stream.position;
                     }
-
                     addressPosition += SpriteFileSize.ADDRESS;
                 }
-
+            }
+            finally
+            {
                 stream.close();
-                done = true;
+            }
+        }
+
+        /** Release the Windows file handle only after every output has been staged. */
+        public function closeSource():void
+        {
+            if (_reader)
+                _reader.close();
+            _reader = null;
+        }
+
+        /** Reopen after a failed commit without discarding unsaved sprites. */
+        public function reopenSource(source:File = null):void
+        {
+            if (_file && !_reader)
+            {
+                var reader:SpriteReader = new SpriteReader(_currentFeatures);
+                try
+                {
+                    reader.open(source ? source : _file, FileMode.READ);
+                    reader.readSignature();
+                    reader.readSpriteCount();
+                    _reader = reader;
+                    if (source) _file = source;
+                }
+                catch (error:Error)
+                {
+                    reader.close();
+                    throw error;
+                }
+            }
+        }
+
+        /** Adopt a committed file. All fallible reads precede changes to session state. */
+        public function acceptSave(file:File, version:Version, features:ClientFeatures):void
+        {
+            var savedFeatures:ClientFeatures = features.clone();
+            savedFeatures.applyVersionDefaults(version.value);
+            var reader:SpriteReader = new SpriteReader(savedFeatures);
+            try
+            {
+                reader.open(file, FileMode.READ);
+                var signature:uint = reader.readSignature();
+                var count:uint = reader.readSpriteCount();
+                if (signature != version.sprSignature || count != _spritesCount)
+                    throw new Error("The saved SPR header could not be verified.");
             }
             catch (error:Error)
             {
-                dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false, error.getStackTrace(), error.errorID));
-                done = false;
+                reader.close();
+                throw error;
             }
 
-            if (done)
-            {
-                // Closes the current spr file
-                if (equal)
-                    _reader.close();
-
-                // Delete old file.
-                if (file.exists)
-                    file.deleteFile();
-
-                // Rename the temporary file
-                _file = FileUtil.rename(tmpFile, FileUtil.getName(file));
-
-                // Reload all if equal.
-                if (equal)
-                    this.onLoad(file, version, features, true);
-            }
-            else if (tmpFile.exists)
-            {
-                tmpFile.deleteFile();
-            }
-
-            dispatchEvent(new StorageEvent(StorageEvent.COMPILE));
-            dispatchEvent(new StorageEvent(StorageEvent.CHANGE));
-
-            return done;
+            _reader = reader;
+            _file = file;
+            _version = version;
+            _currentFeatures = savedFeatures;
+            _signature = signature;
+            _changed = false;
+            // Keep edited sprites cached. Their original format remains valid and is
+            // converted on a subsequent export if necessary.
         }
 
         public function isEmptySprite(id:uint):Boolean

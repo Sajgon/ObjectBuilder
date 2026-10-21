@@ -3473,9 +3473,14 @@ THE SOFTWARE.
             
                     var frameGroup:FrameGroup = thing.getFrameGroup(groupType);
                     var size:Size = frameGroup.getSpriteSheetSize();
-            
-                    // Check if this is a single frame group spritesheet
-                    if (bitmap.width == size.width && size.height == bitmap.height)
+                    var horizontalSize:Size = frameGroup.getSpriteSheetSize(true);
+                    var expectedSizes:Array = [size.width + "x" + size.height];
+                    var horizontalLabel:String = horizontalSize.width + "x" + horizontalSize.height;
+                    if (expectedSizes.indexOf(horizontalLabel) < 0)
+                        expectedSizes.push(horizontalLabel);
+
+                    // Accept vertical or horizontal animation frames for the selected group.
+                    if (frameGroup.matchesSpriteSheetSize(bitmap.width, bitmap.height))
                     {
                         // Copy sprites from ALL frame groups (preserve other groups)
                         var sprites:Dictionary = new Dictionary();
@@ -3554,14 +3559,17 @@ THE SOFTWARE.
                             else
                             {
                                 var message:String = resourceManager.getString("strings", "invalidSpriteSheetSize");
-                                Alert.show(StringUtil.format(message, size.width + " or " + totalSize.width, size.height + " or " + totalSize.height),
+                                var combinedLabel:String = totalSize.width + "x" + totalSize.height;
+                                if (expectedSizes.indexOf(combinedLabel) < 0)
+                                    expectedSizes.push(combinedLabel);
+                                Alert.show(StringUtil.format(message, expectedSizes.join(", ")),
                                         resourceManager.getString("strings", "invalidSpriteSheetSizeTitle"));
                             }
                         }
                         else
                         {
                             var message2:String = resourceManager.getString("strings", "invalidSpriteSheetSize");
-                            Alert.show(StringUtil.format(message2, size.width, size.height),
+                            Alert.show(StringUtil.format(message2, expectedSizes.join(", ")),
                                     resourceManager.getString("strings", "invalidSpriteSheetSizeTitle"));
                         }
                     }

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<application xmlns="http://ns.adobe.com/air/application/32.0">
+  <id>com.objectbuilder.SaveRegression</id>
+  <filename>SaveRegression</filename><versionNumber>1.0.0</versionNumber>
+  <initialWindow><content>SaveRegression.swf</content><visible>false</visible></initialWindow>
+  <supportedProfiles>extendedDesktop</supportedProfiles><architecture>64</architecture>
+</application>

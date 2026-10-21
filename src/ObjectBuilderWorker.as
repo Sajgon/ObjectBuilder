@@ -31,6 +31,7 @@ package
     import flash.events.ErrorEvent;
     import flash.events.Event;
     import flash.filesystem.File;
+    import otlib.utils.ProjectSaver;
     import flash.filesystem.FileMode;
     import flash.filesystem.FileStream;
     import flash.system.System;
@@ -656,104 +657,47 @@ package
                 version:Version,
                 features:ClientFeatures):void
         {
-            // ... skipped
-            if (isNullOrEmpty(datPath))
-                throw new NullOrEmptyArgumentError("datPath");
-
-            if (isNullOrEmpty(sprPath))
-                throw new NullOrEmptyArgumentError("sprPath");
-
-            if (!version)
-                throw new NullArgumentError("version");
-
-            if (!_things || !_things.loaded)
-                throw new Error(Resources.getString("metadataNotLoaded"));
-
-            if (!_sprites || !_sprites.loaded)
-                throw new Error(Resources.getString("spritesNotLoaded"));
-
-            var dat:File = new File(datPath);
-            var spr:File = new File(sprPath);
-            var structureChanged:Boolean = _features.differs(features);
-
-            // Update attribute server in registry using the features passed to compile
-            if (features.attributeServer)
+            try
             {
-                _attributeRegistry.loadServer(features.attributeServer);
-            }
+                if (isNullOrEmpty(datPath) || isNullOrEmpty(sprPath) || !version || !features)
+                    throw new ArgumentError("Missing project save settings.");
+                if (!_things || !_things.loaded || !_sprites || !_sprites.loaded)
+                    throw new Error("Client data is not loaded.");
+                var dat:File = new File(datPath);
+                var spr:File = new File(sprPath);
+                var structureChanged:Boolean = _features.differs(features);
+                if (features.attributeServer)
+                    _attributeRegistry.loadServer(features.attributeServer);
 
-            // 1/3 Saving DAT
-            sendCommand(new ProgressCommand(ProgressBarID.METADATA, 0, 3, "Saving DAT"));
-            if (!_things.compile(dat, version, features))
-            {
-                return;
-            }
+                ProjectSaver.save(_things, _sprites, _items, dat, spr,
+                        isNullOrEmpty(serverItemsPath) ? null : new File(serverItemsPath),
+                        serverItemsFormat, serverItemsBinaryPeer, version, features,
+                        function(step:uint, label:String):void
+                        {
+                            sendCommand(new ProgressCommand(ProgressBarID.METADATA, step, 4, label));
+                        });
 
-            // 2/3 Saving SPR
-            sendCommand(new ProgressCommand(ProgressBarID.METADATA, 1, 3, "Saving SPR"));
-            if (!_sprites.compile(spr, version, features))
-            {
-                return;
-            }
-
-            // 3/3 Exporting Server Items (if requested)
-            if (!isNullOrEmpty(serverItemsPath))
-            {
-                sendCommand(new ProgressCommand(ProgressBarID.METADATA, 2, 3, "Exporting Server Items"));
-
-                var itemsFile:File = new File(serverItemsPath);
-                var itemsDir:File = itemsFile.parent;
-                var baseName:String = itemsFile.name;
-                var dotIndex:int = baseName.lastIndexOf(".");
-                if (dotIndex != -1)
-                    baseName = baseName.substring(0, dotIndex);
-
-                // 1. Export Definitions (XML/TOML)
-                var defFile:File = itemsDir.resolvePath(baseName + "." + (serverItemsFormat == OTFormat.TOML ? "toml" : "xml"));
-                if (!_items.saveDefinitions(defFile, serverItemsFormat))
-                {
-                    Log.error("Failed to save server items to " + defFile.nativePath);
-                }
-
-                // 2. Export Binary Peer (OTB/DAT/ASSETS)
-                if (serverItemsBinaryPeer != null)
-                {
-                    var peerExtension:String = "otb";
-                    if (serverItemsBinaryPeer == OTFormat.DAT)
-                        peerExtension = "dat";
-                    else if (serverItemsBinaryPeer == OTFormat.ASSETS)
-                        peerExtension = "dat";
-
-                    var peerFile:File = itemsDir.resolvePath(baseName + "." + peerExtension);
-
-                    if (!_items.save(peerFile, serverItemsBinaryPeer, dat))
-                    {
-                        Log.error("Failed to save/export binary peer: " + peerFile.nativePath);
-                    }
-                }
-            }
-
-            // Save .otfi file
-            var dir:File = FileUtil.getDirectory(dat);
-            var otfiFile:File = dir.resolvePath(FileUtil.getName(dat) + ".otfi");
-            var otfi:OTFI = new OTFI(features, dat.name, spr.name, SpriteExtent.DEFAULT_SIZE, SpriteExtent.DEFAULT_DATA_SIZE);
-            otfi.save(otfiFile);
-
-            // Complete
-            sendCommand(new ProgressCommand(ProgressBarID.METADATA, 3, 3, "Saving complete"));
-
-            clientCompileComplete();
-
-            if (!_datFile || !_sprFile)
-            {
                 _datFile = dat;
                 _sprFile = spr;
+                _version = version;
+                _features = features.clone();
+                clientCompileComplete();
+                if (structureChanged)
+                    sendCommand(new NeedToReloadCommand(features));
+                else
+                    sendClientInfo();
             }
-
-            if (structureChanged)
-                sendCommand(new NeedToReloadCommand(features));
-            else
+            catch (error:Error)
+            {
+                // One error, no success notification, and the in-memory edits stay available.
+                Log.error(error.message);
                 sendClientInfo();
+            }
+            finally
+            {
+                sendCommand(new HideProgressBarCommand(ProgressBarID.METADATA));
+                sendCommand(new HideProgressBarCommand(ProgressBarID.DEFAULT));
+            }
         }
 
         private function unloadFilesCallback():void
