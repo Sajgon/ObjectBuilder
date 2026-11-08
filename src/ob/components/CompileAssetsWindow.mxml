@@ -223,7 +223,16 @@ THE SOFTWARE.
             
             public function get serverItemsPath():String
             {
-                return m_serverItemsDirectory ? m_serverItemsDirectory.nativePath : null;
+                if (!m_serverItemsLoaded || !serverItemsEnableCheckBox.selected || !m_serverItemsDirectory)
+                    return null;
+
+                // The worker expects a file anchor, not its containing directory.
+                var name:String = "items.otb";
+                if (m_serverItemsBinaryPeer == OTFormat.DAT)
+                    name = "Tibia.dat";
+                else if (m_serverItemsBinaryPeer == OTFormat.ASSETS)
+                    name = "assets.dat";
+                return m_serverItemsDirectory.resolvePath(name).nativePath;
             }
             
             public function get serverItemsFormat():String

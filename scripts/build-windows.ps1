@@ -35,7 +35,7 @@ try {
         Get-ChildItem -LiteralPath 'src/config' | Copy-Item -Destination 'bin-release/config' -Recurse -Force
         $descriptor = [IO.File]::ReadAllText((Join-Path $repo 'src/ObjectBuilder-app.xml'))
         $descriptor = $descriptor.Replace('[This value will be overwritten by Flash Builder in the output app.xml]', 'ObjectBuilder.swf')
-        $descriptor = $descriptor.Replace('<versionLabel>0.6.0</versionLabel>', '<versionLabel>0.6.0-savefix.2</versionLabel>')
+        $descriptor = $descriptor.Replace('<versionLabel>0.6.0</versionLabel>', '<versionLabel>0.6.0-savefix.3</versionLabel>')
         [IO.File]::WriteAllText((Join-Path $repo 'bin-release/ObjectBuilder-app.xml'), $descriptor)
     }
     & java @common '-debug=true' '-source-path+=tests' '-output=bin-debug/SaveRegression.swf' 'tests/SaveRegression.as'

@@ -1,9 +1,17 @@
 # Object Builder save and import fixes
 
 This patched build is based on upstream Object Builder 0.6.0 and labelled
-`0.6.0-savefix.2`. It uses a separate application ID and preferences so it can
+`0.6.0-savefix.3`. It uses a separate application ID and preferences so it can
 coexist with an older installation. Launch `ObjectBuilder.exe` and open your
 DAT/SPR project and server items as usual.
+
+## Compile As server exports
+
+Server definitions and binaries are exported only when Enable Export is on.
+An enabled export writes inside the selected server folder, using `items.otb`,
+`Tibia.dat`, or `assets.dat` for the selected binary format. The matching
+definition file uses the same base name. Later Compile operations continue
+saving to the exported files.
 
 ## Horizontal animation strips
 
