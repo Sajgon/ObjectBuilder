@@ -4458,10 +4458,10 @@ THE SOFTWARE.
                         width="100%" height="100%"
                         mouseWheel="previewMouseWheelHandler(event)">
                         <s:Group>
-                            <otlib:ThingDataView id="thingView"
-                                horizontalCenter="0"
-                                verticalCenter="0"
-                                minSize="160"/>
+                            <s:layout>
+                                <otlib:PreviewLayout/>
+                            </s:layout>
+                            <otlib:ThingDataView id="thingView" minSize="160"/>
                         </s:Group>
                     </s:Scroller>
                 </nail:GroupBox>

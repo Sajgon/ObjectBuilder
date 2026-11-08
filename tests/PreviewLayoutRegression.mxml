@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:WindowedApplication xmlns:fx="http://ns.adobe.com/mxml/2009"
+    xmlns:s="library://ns.adobe.com/flex/spark" width="400" height="320"
+    invoke="receiveInvoke(event)" creationComplete="ready()">
+    <fx:Script><![CDATA[
+        import flash.desktop.NativeApplication;
+        import flash.events.InvokeEvent;
+        import flash.filesystem.File;
+        import flash.filesystem.FileMode;
+        import flash.filesystem.FileStream;
+        import mx.core.UIComponent;
+        import otlib.components.PreviewLayout;
+        import spark.components.Group;
+        import spark.layouts.BasicLayout;
+
+        private var resultFile:File;
+        private var preview:UIComponent;
+        private var viewport:Group;
+        private var cases:Array = [];
+        private var checks:uint = 0;
+        private var caseIndex:uint = 0;
+        private var legacy:Boolean;
+        private var invokeArguments:Array;
+        private var uiReady:Boolean;
+
+        private function ready():void
+        {
+            uiReady = true;
+            if (invokeArguments) run();
+        }
+
+        private function receiveInvoke(event:InvokeEvent):void
+        {
+            invokeArguments = event.arguments;
+            if (uiReady) run();
+        }
+
+        private function run():void
+        {
+            resultFile = new File(invokeArguments[0]);
+            legacy = invokeArguments.length > 1 && invokeArguments[1] == "--legacy";
+            viewport = new Group();
+            viewport.layout = legacy ? new BasicLayout() : new PreviewLayout();
+            preview = new UIComponent();
+            if (legacy) preview.horizontalCenter = preview.verticalCenter = 0;
+            viewport.addElement(preview);
+            scroller.viewport = viewport;
+            // First reproduce the exact dimensions captured in the hung editor.
+            cases.push([158, 164, 160, 1]);
+            for each (var w:Number in [140, 145, 158, 159, 160, 161, 162, 170, 176, 190, 262])
+                for each (var h:Number in [80, 148, 159, 160, 164, 180, 250])
+                    for each (var size:Number in [32, 160, 512])
+                        for each (var zoom:Number in [0.25, 1, 2, 5])
+                            cases.push([w, h, size, zoom]);
+            callLater(nextCase);
+        }
+
+        private function nextCase():void
+        {
+            try
+            {
+                if (caseIndex == cases.length) { finish("PASS: " + checks + " checks across " + caseIndex + " layouts", 0); return; }
+                var c:Array = cases[caseIndex++];
+                scroller.width = c[0]; scroller.height = c[1];
+                preview.width = preview.height = c[2];
+                preview.scaleX = preview.scaleY = c[3];
+                scroller.validateNow();
+                // Yield to the normal layout queue too; a self-invalidating
+                // Scroller must not prevent this next callback from running.
+                callLater(checkCase);
+            }
+            catch (error:Error) { finish("FAIL: " + error.message, 1); }
+        }
+
+        private function checkCase():void
+        {
+            try
+            {
+                if (!legacy)
+                {
+                    var w:Number = preview.getLayoutBoundsWidth();
+                    var h:Number = preview.getLayoutBoundsHeight();
+                    check(preview.getLayoutBoundsX() >= 0 && preview.getLayoutBoundsY() >= 0, "nonnegative sprite origin");
+                    check(viewport.contentWidth >= w && viewport.contentHeight >= h, "complete scaled sprite is scrollable");
+                    check(Math.abs(preview.getLayoutBoundsX() - Math.max(0, Math.floor((viewport.width-w)/2))) < 1, "horizontal centering");
+                    check(Math.abs(preview.getLayoutBoundsY() - Math.max(0, Math.floor((viewport.height-h)/2))) < 1, "vertical centering");
+                }
+                callLater(nextCase);
+            }
+            catch (error:Error) { finish("FAIL: " + error.message, 1); }
+        }
+
+        private function check(ok:Boolean, label:String):void
+        {
+            if (!ok) throw new Error(label + " in layout " + caseIndex);
+            checks++;
+        }
+
+        private function finish(message:String, code:int):void
+        {
+            var stream:FileStream = new FileStream();
+            stream.open(resultFile, FileMode.WRITE); stream.writeUTFBytes(message); stream.close();
+            NativeApplication.nativeApplication.exit(code);
+        }
+    ]]></fx:Script>
+    <s:Scroller id="scroller" width="158" height="164"/>
+</s:WindowedApplication>

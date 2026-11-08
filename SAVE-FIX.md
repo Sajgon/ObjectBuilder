@@ -1,9 +1,20 @@
 # Object Builder save and import fixes
 
 This patched build is based on upstream Object Builder 0.6.0 and labelled
-`0.6.0-savefix.3`. It uses a separate application ID and preferences so it can
+`0.6.0-savefix.4`. It uses a separate application ID and preferences so it can
 coexist with an older installation. Launch `ObjectBuilder.exe` and open your
 DAT/SPR project and server items as usual.
+
+## Project loading and preview layout
+
+The preview keeps oversized sprites at a nonnegative origin and centers sprites
+that fit. This prevents automatic scrollbars from repeatedly changing the
+reported content size at narrow panel widths, which could freeze the UI while
+opening a valid project. Zoomed sprites remain fully scrollable.
+
+Run `./scripts/test-preview-layout-windows.ps1 -AirSdk C:/path/to/air` for the
+layout regression suite. `-Legacy` reproduces the old centered BasicLayout for
+comparison; the runner terminates a hung test after 60 seconds.
 
 ## Compile As server exports
 

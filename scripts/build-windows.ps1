@@ -35,7 +35,7 @@ try {
         Get-ChildItem -LiteralPath 'src/config' | Copy-Item -Destination 'bin-release/config' -Recurse -Force
         $descriptor = [IO.File]::ReadAllText((Join-Path $repo 'src/ObjectBuilder-app.xml'))
         $descriptor = $descriptor.Replace('[This value will be overwritten by Flash Builder in the output app.xml]', 'ObjectBuilder.swf')
-        $descriptor = $descriptor.Replace('<versionLabel>0.6.0</versionLabel>', '<versionLabel>0.6.0-savefix.3</versionLabel>')
+        $descriptor = $descriptor.Replace('<versionLabel>0.6.0</versionLabel>', '<versionLabel>0.6.0-savefix.4</versionLabel>')
         [IO.File]::WriteAllText((Join-Path $repo 'bin-release/ObjectBuilder-app.xml'), $descriptor)
     }
     & java @common '-debug=true' '-source-path+=tests' '-output=bin-debug/SaveRegression.swf' 'tests/SaveRegression.as'
@@ -44,5 +44,8 @@ try {
     & java @common '-debug=true' '-source-path+=tests' '-output=bin-debug/SpriteSheetRegression.swf' 'tests/SpriteSheetRegression.as'
     if ($LASTEXITCODE -ne 0) { throw 'Sprite sheet test compilation failed.' }
     Copy-Item -LiteralPath 'tests/SpriteSheetRegression-app.xml' -Destination 'bin-debug'
+    & java @common '-debug=true' '-source-path+=tests' '-output=bin-debug/PreviewLayoutRegression.swf' 'tests/PreviewLayoutRegression.mxml'
+    if ($LASTEXITCODE -ne 0) { throw 'Preview layout test compilation failed.' }
+    Copy-Item -LiteralPath 'tests/PreviewLayoutRegression-app.xml' -Destination 'bin-debug'
     Write-Output 'BUILD SUCCESSFUL'
 } finally { Pop-Location }
