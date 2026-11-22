@@ -3830,6 +3830,9 @@ THE SOFTWARE.
                                     maximum="0xFFFFFF"
                                     value="{_thingBinding.marketTradeAs}"
                                     change="{_thingBinding.marketTradeAs = tradeAsNumericStepper.value;}"/>
+                                <s:Button label="+" width="22" height="20"
+                                    toolTip="@Resource(key='useClientId', bundle='strings')"
+                                    click="{_thingBinding.marketTradeAs = _thingBinding.id;}"/>
                             </s:HGroup>
                             <s:HGroup width="100%"
                                 verticalAlign="middle"
@@ -3843,6 +3846,9 @@ THE SOFTWARE.
                                     maximum="0xFFFFFF"
                                     value="{_thingBinding.marketShowAs}"
                                     change="{_thingBinding.marketShowAs = showAsNumericStepper.value;}"/>
+                                <s:Button label="+" width="22" height="20"
+                                    toolTip="@Resource(key='useClientId', bundle='strings')"
+                                    click="{_thingBinding.marketShowAs = _thingBinding.id;}"/>
                             </s:HGroup>
                             <s:HGroup width="100%"
                                 verticalAlign="middle"
